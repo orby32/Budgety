@@ -5,7 +5,20 @@ var budgetController = (function () {
     this.id = id;
     this.description = description;
     this.value = value;
+    this.percentage = -1;
 };
+
+Expense.prototype.calcPercentage = function(totalIncome) {
+  if (totalIncome > 0) {
+    this.percentage = Math.round((this.value / totalIncome) * 100);
+  } else {
+    this.percentage = -1;
+  }
+};
+
+Expense.prototype.getPercentage = function() {
+  return this.percentage;
+}
 
   var Income = function (id, description, value) {
     this.id = id;
@@ -31,7 +44,7 @@ var budgetController = (function () {
         inc: 0
     },
     budget: 0,
-    precentage: -1
+    percentage: -1
 };
 
 
@@ -83,12 +96,25 @@ var budgetController = (function () {
       // Calculate the budge: income - expenses
       data.budget = data.totals.inc - data.totals.exp;
 
-      // Calculate the precentage of income that we spent
+      // Calculate the percentage of income that we spent
       if (data.totals.inc > 0) {
-        data.precentage = Math.round((data.totals.exp / data.totals.inc) * 100);
+        data.percentage = Math.round((data.totals.exp / data.totals.inc) * 100);
       } else {
-        data.precentage = -1;
+        data.percentage = -1;
       }
+    },
+
+    calculatePercentages: function() {
+      data.allItems.exp.forEach(function(cur) {
+        cur.calcPercentage(data.totals.inc);
+      });
+    },
+
+    getPercentages: function() {
+      var allPerc = data.allItems.exp.map(function(cur) {
+        return cur.getPercentage();
+      });
+      return allPerc;
     },
 
     getBudget: function() {
@@ -96,7 +122,7 @@ var budgetController = (function () {
         budget: data.budget,
         totalInc: data.totals.inc,
         totalExp: data.totals.exp,
-        precentage: data.precentage
+        percentage: data.percentage
       }
     },
 
@@ -121,8 +147,9 @@ var UIController = (function () {
     budgetLabel: '.budget__value',
     incomeLabel: '.budget__income--value',
     expensesLabel: '.budget__expenses--value',
-    precentageLabel: '.budget__expenses--percentage',
-    container: '.container'
+    percentageLabel: '.budget__expenses--percentage',
+    container: '.container',
+    expensesPercLabel: '.item__percentage'
   }
 
   return {
@@ -185,11 +212,30 @@ var UIController = (function () {
       document.querySelector(DOMstrings.incomeLabel).textContent = obj.totalInc;
       document.querySelector(DOMstrings.expensesLabel).textContent = obj.totalExp;
 
-      if (obj.precentage > 0) {
-        document.querySelector(DOMstrings.precentageLabel).textContent = obj.precentage + '%';
+      if (obj.percentage > 0) {
+        document.querySelector(DOMstrings.percentageLabel).textContent = obj.percentage + '%';
       } else {
-        document.querySelector(DOMstrings.precentageLabel).textContent = '---';
+        document.querySelector(DOMstrings.percentageLabel).textContent = '---';
       }
+    },
+
+    displayPercentages: function(percentages) {
+      var fields = document.querySelectorAll(DOMstrings.expensesPercLabel);
+
+      var NodeListForEach = function(list, callback) {
+        for (var i = 0; i < list.length; i++) {
+          callback(list[i], i);
+        }
+      };
+
+      NodeListForEach(fields, function(current, index) {
+
+        if (percentages[index] > 0) {
+          current.textContent = percentages[index] + '%';
+        } else {
+          current.textContent = '---';
+        }
+      });
     },
 
     getDOMstrings: function () {
@@ -232,10 +278,13 @@ var controller = (function (budgetCtrl, UICtrl) {
   var updatePercentages = function() {
 
     // 1. Calculate percentages 
+      budgetCtrl.calculatePercentages();
 
     // 2. Read percentages from the budget controller
+      var percentages = budgetCtrl.getPercentages();
 
     // 3. Update the UI with the new percentages 
+    UICtrl.displayPercentages(percentages);
   };
 
   var ctrlAddItem = function () {
@@ -295,7 +344,7 @@ var controller = (function (budgetCtrl, UICtrl) {
         budget: 0,
         totalInc: 0,
         totalExp: 0,
-        precentage: -1
+        percentage: -1
       });
       setupEventListeners();
     }
